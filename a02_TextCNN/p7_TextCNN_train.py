@@ -15,11 +15,14 @@ import pickle
 import h5py
 import os
 import random
+from sklearn.metrics import accuracy_score
 #configuration
 FLAGS=tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string("traning_data_path", "/Users/sunyitao/Documents/Projects/GitHub/PsychicLearners/data/fashion_train_invert.txt",
+tf.app.flags.DEFINE_string("training_data_path", "/Users/sunyitao/Documents/Projects/GitHub/PsychicLearners/data/fashion_train_invert.txt",
                            "path of traning data.")  # ../data/sample_multiple_label.txt
+tf.app.flags.DEFINE_string("valid_data_path", "/Users/sunyitao/Documents/Projects/GitHub/PsychicLearners/data/fashion_valid_invert.txt",
+                           "path of traning data.")
 tf.app.flags.DEFINE_integer("vocab_size",100000,"maximum vocab size.")
 
 #tf.app.flags.DEFINE_string("cache_file_h5py","../data/ieee_zhihu_cup/data.h5","path of training/validation/test data.") #../data/sample_multiple_label.txt
@@ -29,11 +32,11 @@ tf.app.flags.DEFINE_float("learning_rate",0.0003,"learning rate")
 tf.app.flags.DEFINE_integer("batch_size", 64, "Batch size for training/evaluating.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_integer("decay_steps", 1000, "how many steps before decay learning rate.") #6000批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 1.0, "Rate of decay for learning rate.") #0.65一次衰减多少
-tf.app.flags.DEFINE_string("ckpt_dir","text_cnn_title_desc_checkpoint/","checkpoint location for the model")
+tf.app.flags.DEFINE_string("ckpt_dir","text_cnn_title_fashion_checkpoint_1/","checkpoint location for the model")
 tf.app.flags.DEFINE_integer("sentence_len", 15, "max sentence length")
 tf.app.flags.DEFINE_integer("embed_size",128,"embedding size")
 tf.app.flags.DEFINE_boolean("is_training_flag",True,"is training.true:tranining,false:testing/inference")
-tf.app.flags.DEFINE_integer("num_epochs",10,"number of epochs to run.")
+tf.app.flags.DEFINE_integer("num_epochs",15,"number of epochs to run.")
 tf.app.flags.DEFINE_integer("validate_every", 1, "Validate every validate_every epochs.") #每10轮做一次验证
 tf.app.flags.DEFINE_boolean("use_embedding",False,"whether to use embedding or not.")
 tf.app.flags.DEFINE_integer("num_filters", 128, "number of filters") #256--->512
@@ -45,23 +48,23 @@ filter_sizes=[6,7,8]
 #1.load data(X:list of lint,y:int). 2.create session. 3.feed data. 4.training (5.validation) ,(6.prediction)
 def main(_):
     trainX, trainY, testX, testY = None, None, None, None
-    vocabulary_word2index, vocabulary_index2word, vocabulary_label2index, _= create_vocabulary(FLAGS.traning_data_path,FLAGS.vocab_size,name_scope=FLAGS.name_scope)
+    vocabulary_word2index, vocabulary_index2word, vocabulary_label2index, _= create_vocabulary(FLAGS.training_data_path,FLAGS.vocab_size,name_scope=FLAGS.name_scope)
     #word2index, label2index, trainX, trainY, vaildX, vaildY, testX, testY=load_data(FLAGS.cache_file_h5py, FLAGS.cache_file_pickle)
     #vocab_size = len(word2index);print("cnn_model.vocab_size:",vocab_size);num_classes=len(label2index);print("num_classes:",num_classes)
     vocab_size = len(vocabulary_word2index)
     print("cnn_model.vocab_size:", vocab_size)
     num_classes = len(vocabulary_label2index)
     print("num_classes:", num_classes)
-    num_classes=14
     #num_examples,FLAGS.sentence_len=trainX.shape
     #print("num_examples of training:",num_examples,";sentence_len:",FLAGS.sentence_len)
-    train, test= load_data_multilabel(FLAGS.traning_data_path,vocabulary_word2index, vocabulary_label2index,FLAGS.sentence_len)
+    train = load_data_multilabel(FLAGS.training_data_path,vocabulary_word2index, vocabulary_label2index,FLAGS.sentence_len)
+    test = load_data_multilabel(FLAGS.valid_data_path, vocabulary_word2index, vocabulary_label2index, FLAGS.sentence_len)
     trainX, trainY = train;testX, testY = test
     #print some message for debug purpose
     print("trainX[0:10]:", trainX[0:10])
     print("trainY[0]:", trainY[0:10])
-    train_y_short = get_target_label_short(trainY[0])
-    print("train_y_short:", train_y_short)
+    #train_y_short = get_target_label_short(trainY[0])
+    #print("train_y_short:", train_y_short)
 
     #2.create session.
     config=tf.ConfigProto()
@@ -104,15 +107,15 @@ def main(_):
                 loss,counter=loss+curr_loss,counter+1
                 if counter %50==0:
                     print("Epoch %d\tBatch %d\tTrain Loss:%.3f\tLearning rate:%.5f" %(epoch,counter,loss/float(counter),lr))
-
+                """
                 ########################################################################################################
                 if start%(3000*FLAGS.batch_size)==0: # eval every 3000 steps.
-                    eval_loss, f1_score,f1_micro,f1_macro = do_eval(sess, textCNN, vaildX, vaildY,num_classes)
+                    eval_loss, f1_score,f1_micro,f1_macro = do_eval(sess, textCNN, testX, testY,num_classes)
                     print("Epoch %d Validation Loss:%.3f\tF1 Score:%.3f\tF1_micro:%.3f\tF1_macro:%.3f" % (epoch, eval_loss, f1_score,f1_micro,f1_macro))
                     # save model to checkpoint
                     save_path = FLAGS.ckpt_dir + "model.ckpt"
                     print("Going to save model..")
-                    saver.save(sess, save_path, global_step=epoch)
+                    saver.save(sess, save_path, global_step=epoch)"""
                 ########################################################################################################
             #epoch increment
             print("going to increment epoch counter....")
@@ -121,39 +124,44 @@ def main(_):
             # 4.validation
             print(epoch,FLAGS.validate_every,(epoch % FLAGS.validate_every==0))
             if epoch % FLAGS.validate_every==0:
-                eval_loss,f1_score,f1_micro,f1_macro=do_eval(sess,textCNN,testX,testY,num_classes)
-                print("Epoch %d Validation Loss:%.3f\tF1 Score:%.3f\tF1_micro:%.3f\tF1_macro:%.3f" % (epoch,eval_loss,f1_score,f1_micro,f1_macro))
+                test_loss, test_acc = do_eval(sess, textCNN, testX, testY, num_classes)
+                print("Test Loss:{} accuracy:{}".format(test_loss, test_acc))
                 #save model to checkpoint
                 save_path=FLAGS.ckpt_dir+"model.ckpt"
                 saver.save(sess,save_path,global_step=epoch)
 
         # 5.最后在测试集上做测试，并报告测试准确率 Test
-        test_loss,f1_score,f1_micro,f1_macro = do_eval(sess, textCNN, testX, testY,num_classes)
-        print("Test Loss:%.3f\tF1 Score:%.3f\tF1_micro:%.3f\tF1_macro:%.3f" % ( test_loss,f1_score,f1_micro,f1_macro))
+        test_loss, test_acc = do_eval(sess, textCNN, testX, testY,num_classes)
+        print("Test Loss:{} Accuracy:{}".format( test_loss, test_acc))
     pass
 
 
 # 在验证集上做验证，报告损失、精确度
 def do_eval(sess,textCNN,evalX,evalY,num_classes):
-    evalX=evalX[0:3000]
-    evalY=evalY[0:3000]
+    #evalX=evalX[0:3000]
+    #evalY=evalY[0:3000]
     number_examples=len(evalX)
     eval_loss,eval_counter,eval_f1_score,eval_p,eval_r=0.0,0,0.0,0.0,0.0
     batch_size=1
     label_dict_confuse_matrix=init_label_dict(num_classes)
+    correct = 0
     for start,end in zip(range(0,number_examples,batch_size),range(batch_size,number_examples,batch_size)):
-        feed_dict = {textCNN.input_x: evalX[start:end], textCNN.input_y_multilabel:evalY[start:end],textCNN.dropout_keep_prob: 1.0,
+        feed_dict = {textCNN.input_x: evalX[start:end], textCNN.input_y:evalY[start:end],textCNN.dropout_keep_prob: 1.0,
                      textCNN.is_training_flag: False}
         curr_eval_loss, logits= sess.run([textCNN.loss_val,textCNN.logits],feed_dict)#curr_eval_acc--->textCNN.accuracy
-        predict_y = get_label_using_logits(logits[0])
-        target_y= get_target_label_short(evalY[start:end][0])
+        #predict_y = get_label_using_logits(logits[0])
+        #target_y= get_target_label_short(evalY[start:end][0])
+        predict_y = logits
+        target_y = evalY[start:end]
+        if np.argmax(predict_y[0], axis=0) == np.argmax(target_y[0]):
+            correct += 1
         #f1_score,p,r=compute_f1_score(list(label_list_top5), evalY[start:end][0])
-        label_dict_confuse_matrix=compute_confuse_matrix(target_y, predict_y, label_dict_confuse_matrix)
+        #label_dict_confuse_matrix=compute_confuse_matrix(target_y, predict_y, label_dict_confuse_matrix)
         eval_loss,eval_counter=eval_loss+curr_eval_loss,eval_counter+1
-
-    f1_micro,f1_macro=compute_micro_macro(label_dict_confuse_matrix) #label_dict_accusation is a dict, key is: accusation,value is: (TP,FP,FN). where TP is number of True Positive
-    f1_score=(f1_micro+f1_macro)/2.0
-    return eval_loss/float(eval_counter),f1_score,f1_micro,f1_macro
+    acc = correct / number_examples
+    #f1_micro,f1_macro=compute_micro_macro(label_dict_confuse_matrix) #label_dict_accusation is a dict, key is: accusation,value is: (TP,FP,FN). where TP is number of True Positive
+    #f1_score=(f1_micro+f1_macro)/2.0
+    return eval_loss/float(eval_counter), acc
 
 #######################################
 def compute_f1_score(predict_y,eval_y):

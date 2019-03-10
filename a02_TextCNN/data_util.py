@@ -36,17 +36,18 @@ def load_data_multilabel(traning_data_path,vocab_word2index, vocab_label2index,s
         label_list=[l.strip().replace(" ", "") for l in label_list if l != '']
         label_list=[vocab_label2index[label] for label in label_list]
         y=transform_multilabel_as_multihot(label_list,label_size)
+        #y=label_list[0]
         X.append(x)
         Y.append(y)
         if i<10:print(i,"line:",line)
 
     X = pad_sequences(X, maxlen=sentence_len, value=0.)  # padding to max length
-    number_examples = len(lines)
-    training_number=int(training_portion* number_examples)
-    train = (X[0:training_number], Y[0:training_number])
-    valid_number=min(1000,number_examples-training_number)
-    test = (X[training_number+ 1:training_number+valid_number+1], Y[training_number + 1:training_number+valid_number+1])
-    return train,test
+    #number_examples = len(lines)
+    #training_number=int(training_portion* number_examples)
+    #train = (X[0:training_number], Y[0:training_number])
+    #valid_number=min(1000,number_examples-training_number)
+    #test = (X[training_number+ 1:training_number+valid_number+1], Y[training_number + 1:training_number+valid_number+1])
+    return X, Y
 
 
 def transform_multilabel_as_multihot(label_list,label_size):

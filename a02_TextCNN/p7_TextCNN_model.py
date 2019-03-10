@@ -6,7 +6,7 @@ import numpy as np
 
 class TextCNN:
     def __init__(self, filter_sizes,num_filters,num_classes, learning_rate, batch_size, decay_steps, decay_rate,sequence_length,vocab_size,embed_size
-                 ,initializer=tf.random_normal_initializer(stddev=0.1),multi_label_flag=False,clip_gradients=5.0,decay_rate_big=0.50):
+                 ,initializer=tf.variance_scaling_initializer(),multi_label_flag=False,clip_gradients=5.0,decay_rate_big=0.50):
         """init all hyperparameter here"""
         # set hyperparamter
         self.num_classes = num_classes
@@ -26,8 +26,9 @@ class TextCNN:
 
         # add placeholder (X,label)
         self.input_x = tf.placeholder(tf.int32, [None, self.sequence_length], name="input_x")  # X
-        #self.input_y = tf.placeholder(tf.int32, [None,],name="input_y")  # y:[None,num_classes]
-        self.input_y_multilabel = tf.placeholder(tf.float32,[None,self.num_classes], name="input_y_multilabel")  # y:[None,num_classes]. this is for multi-label classification only.
+        self.input_y = tf.placeholder(
+            tf.int32, [None, self.num_classes], name="input_y")  # y:[None,num_classes]
+        #self.input_y_multilabel = tf.placeholder(tf.float32,[None,self.num_classes], name="input_y_multilabel")  # y:[None,num_classes]. this is for multi-label classification only.
         self.dropout_keep_prob=tf.placeholder(tf.float32,name="dropout_keep_prob")
         self.iter = tf.placeholder(tf.int32) #training iteration
         self.tst=tf.placeholder(tf.bool)
@@ -78,6 +79,7 @@ class TextCNN:
         #5. logits(use linear layer)and predictions(argmax)
         with tf.name_scope("output"):
             logits = tf.matmul(h,self.W_projection) + self.b_projection  #shape:[None, self.num_classes]==tf.matmul([None,self.embed_size],[self.embed_size,self.num_classes])
+            #logits = tf.matmul([None, self.embed_size], [self.embed_size, self.num_classes])
         return logits
 
     def cnn_single_layer(self):
@@ -175,7 +177,8 @@ class TextCNN:
         with tf.name_scope("loss"):
             #input: `logits`:[batch_size, num_classes], and `labels`:[batch_size]
             #output: A 1-D `Tensor` of length `batch_size` of the same type as `logits` with the softmax cross entropy loss.
-            losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.input_y, logits=self.logits);#sigmoid_cross_entropy_with_logits.#losses=tf.nn.softmax_cross_entropy_with_logits(labels=self.input_y,logits=self.logits)
+            #losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.input_y, logits=self.logits);#sigmoid_cross_entropy_with_logits.#
+            losses=tf.nn.softmax_cross_entropy_with_logits(labels=self.input_y,logits=self.logits)
             #print("1.sparse_softmax_cross_entropy_with_logits.losses:",losses) # shape=(?,)
             loss=tf.reduce_mean(losses)#print("2.loss.loss:", loss) #shape=()
             l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
