@@ -13,7 +13,7 @@ _PAD="_PAD"
 _UNK="UNK"
 
 
-def load_data_multilabel(traning_data_path,vocab_word2index, vocab_label2index,sentence_len,training_portion=0.95):
+def load_data_multilabel(traning_data_path,vocab_word2index, vocab_label2index,sentence_len,training_portion=0.8):
     """
     convert data as indexes using word2index dicts.
     :param traning_data_path:
